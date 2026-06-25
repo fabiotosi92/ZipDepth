@@ -164,7 +164,7 @@ python scripts/infer.py \
 
 ## ⚡ Inference
 
-```
+```bash
 python scripts/infer.py --checkpoint <ckpt> --input <path> [options]
 ```
 
@@ -257,7 +257,7 @@ python scripts/benchmark.py --height 384 --width 384 --fp16
 
 Sample output on an **RTX 3090** (ZipDepth-base, 384×384):
 
-```
+```text
   Backend                            Mean     Std     p95    FPS
   ──────────────────────────────────────────────────────────────
   Eager FP32                         5.3 ms  ±0.1   5.0    207
