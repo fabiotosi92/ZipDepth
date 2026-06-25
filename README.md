@@ -1,7 +1,10 @@
 <div align="center">
 
-# ⚡ ZipDepth
-## Bringing Lightweight Zero-Shot Monocular Depth Anywhere, on Any Device
+<h1> ⚡ ZipDepth ⚡ </h1>
+
+<h2>
+  Bringing Lightweight Zero-Shot Monocular Depth <br> Anywhere, on Any Device
+</h2>
 
 # 🏛️ ECCV 2026
 
