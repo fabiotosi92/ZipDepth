@@ -387,3 +387,14 @@ We thank the authors of [Marigold](https://github.com/prs-eth/marigold) and [Dep
   year      = {2026}
 }
 ```
+
+---
+
+## 📧 Contact
+
+For questions about the paper or the code, feel free to reach out:
+
+- **Fabio Tosi** — [fabio.tosi5@unibo.it](mailto:fabio.tosi5@unibo.it)
+- **Luca Bartolomei** — [luca.bartolomei5@unibo.it](mailto:luca.bartolomei5@unibo.it)
+- **Matteo Poggi** — [m.poggi@unibo.it](mailto:m.poggi@unibo.it)
+- **Stefano Mattoccia** — [stefano.mattoccia@unibo.it](mailto:stefano.mattoccia@unibo.it)
