@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Checkpoints & model weights
+# (zipdepth_base.pth is intentionally tracked — see checkpoints/)
+checkpoints/**
+!checkpoints/zipdepth_base.pth
+!checkpoints/zipdepth_base_npu.pth
+*.pt
+*.onnx
+*.bin
+
+# Outputs
+output/
+*_depth.mp4
+*_depth_frames/
+*_depth.jpg
+!assets/**/*_depth.jpg
+*.npy
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+runs/
+log/
+*.tfevents.*
+wandb/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large release assets (hosted on Hugging Face, not in repo)
+assets/training_files.txt
+assets/training_files.txt.gz
+
+# Internal profiling tools (not for public release)
+scripts/profiler.py
+zipdepth/utils/profiler.py
+
+# Misc
+*.tmp
+*.bak

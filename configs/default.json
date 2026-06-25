@@ -1,0 +1,66 @@
+{
+  "model": {
+    "variant": "base",
+    "global_mode": "balanced",
+    "upsample_unfold": true
+  },
+
+  "loss": {
+    "alpha_ssi": 1.0,
+    "alpha_grad": 2.0,
+    "grad_scales": 4
+  },
+
+  "data": {
+    "index_file": "/path/to/dataset_index.json",
+    "domains": null,
+    "max_samples": null,
+    "height": 384,
+    "width": 384,
+    "balanced_sampling": true,
+    "balance_temperature": 0.1
+  },
+
+  "training": {
+    "epochs": 5,
+    "batch_size": 96,
+    "num_workers": 10,
+    "save_dir": "./checkpoints/{variant}_{height}x{width}",
+    "save_every_steps": 5000,
+    "max_step_checkpoints": 5
+  },
+
+  "optimizer": {
+    "type": "adamw",
+    "lr": 1e-3,
+    "weight_decay": 0.05,
+    "scale_lr_with_gpus": true
+  },
+
+  "scheduler": {
+    "type": "onecycle",
+    "pct_start": 0.05,
+    "div_factor": 25.0,
+    "final_div_factor": 1000.0
+  },
+
+  "amp": {
+    "enabled": true,
+    "dtype": "bfloat16"
+  },
+
+  "logging": {
+    "tensorboard": true,
+    "wandb": false,
+    "log_interval_steps": 2000
+  },
+
+  "profiler": {
+    "enabled": false,
+    "dir": "./log/profiler",
+    "wait": 2,
+    "warmup": 2,
+    "active": 5,
+    "repeat": 1
+  }
+}
