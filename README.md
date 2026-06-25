@@ -122,8 +122,8 @@ Pretrained checkpoints are included in the repository under `checkpoints/`:
 
 | File | Upsampling | Params (fused) | Recommended for |
 |------|-----------|---------------|-----------------|
-| `zipdepth_base.pth` | Convex (unfold) | ~6.1 M | GPU / server |
-| `zipdepth_base_npu.pth` | Convex (unfold-free) | ~6.1 M | NPU / mobile / CPU |
+| [`zipdepth_base.pth`](https://github.com/fabiotosi92/ZipDepth/raw/main/checkpoints/zipdepth_base.pth) | Convex (unfold) | ~6.1 M | GPU / server |
+| [`zipdepth_base_npu.pth`](https://github.com/fabiotosi92/ZipDepth/raw/main/checkpoints/zipdepth_base_npu.pth) | Convex (unfold-free) | ~6.1 M | NPU / mobile / CPU |
 
 Both variants share identical encoder and decoder weights. The only difference is the final upsampling step:
 
