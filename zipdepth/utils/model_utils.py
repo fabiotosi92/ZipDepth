@@ -2,6 +2,28 @@ import torch
 import torch.nn as nn
 
 
+def strip_state_dict_prefixes(state_dict: dict) -> dict:
+    """Remove DDP ('module.') and torch.compile ('_orig_mod.') key prefixes.
+
+    Single-GPU training wraps the model in ``torch.compile``, whose ``state_dict()``
+    prefixes every key with ``_orig_mod.``; DDP adds ``module.``. Both (in any order
+    or nesting) are stripped so checkpoints load into a plain model.
+    """
+    prefixes = ('module.', '_orig_mod.')
+
+    def _clean(key: str) -> str:
+        changed = True
+        while changed:
+            changed = False
+            for p in prefixes:
+                if key.startswith(p):
+                    key = key[len(p):]
+                    changed = True
+        return key
+
+    return {_clean(k): v for k, v in state_dict.items()}
+
+
 def _fuse_conv_bn(conv: nn.Conv2d, bn: nn.BatchNorm2d) -> nn.Conv2d:
     device = conv.weight.device
     fused = nn.Conv2d(

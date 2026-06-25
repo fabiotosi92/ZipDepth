@@ -28,7 +28,7 @@ import torch
 import torch.nn as nn
 
 from zipdepth.model.architecture import create_model
-from zipdepth.utils.model_utils import fuse_remaining_conv_bn
+from zipdepth.utils.model_utils import fuse_remaining_conv_bn, strip_state_dict_prefixes
 
 
 # =============================================================================
@@ -41,8 +41,7 @@ def load_model(ckpt_path: str, variant: str, global_mode: str, device: str,
     print(f"Loading checkpoint: {ckpt_path}")
     ckpt = torch.load(ckpt_path, map_location='cpu', weights_only=True)
     sd = ckpt.get('model_state_dict', ckpt)
-    if next(iter(sd)).startswith('module.'):
-        sd = {k[7:]: v for k, v in sd.items()}
+    sd = strip_state_dict_prefixes(sd)
     missing, unexpected = model.load_state_dict(sd, strict=False)
     if unexpected:
         print(f"  Ignored training-only keys: {unexpected}")

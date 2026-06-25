@@ -82,7 +82,7 @@ ZipDepth achieves state-of-the-art accuracy among lightweight embedded models on
 <img src="assets/figures/framework.png" width="860"/>
 </div>
 
-The encoder is organized in four hierarchical stages. Stages 1–2 use **RepVGG** reparameterizable blocks (3×3 + 1×1 + identity branches fused into a single 3×3 at inference) augmented with **Strip Pooling Attention** for horizontal/vertical context. Stage 3 adds **Squeeze-and-Excitation** channel attention and a **Global Context Block**. Stage 4 applies **Efficient Global Attention** via learnable global tokens.
+The encoder is organized in four hierarchical stages. Stages 1–2 use **RepVGG** reparameterizable blocks (3×3 + 1×1 + identity branches fused into a single 3×3 at inference) augmented with **Strip Pooling Attention** for horizontal/vertical context. Stage 3 adds **Squeeze-and-Excitation** channel attention and a **Global Context Block**. Stage 4 deepens the representation with additional RepVGG blocks.
 
 The neck combines **SPPF** multi-scale pooling with a **Cross-Scale Fusion** module. The decoder is a lightweight FPN with a **Convex Upsampling** head for sub-pixel-accurate depth maps.
 
@@ -173,7 +173,7 @@ python scripts/infer.py --checkpoint <ckpt> --input <path> [options]
 | `--checkpoint` | required | Path to `.pth` checkpoint |
 | `--input` | required | Image file, folder, or video |
 | `--output` | auto | Output path (auto-named if omitted) |
-| `--input-size` | `512` | Shorter-side length for model input. Aspect ratio is preserved; the longer side scales proportionally. Rounded to the nearest multiple of 32 (e.g. `384`, `512`, `768`) |
+| `--input-size` | `384` | Shorter-side length for model input. Aspect ratio is preserved; the longer side scales proportionally. Rounded to the nearest multiple of 32 (e.g. `384`, `512`, `768`) |
 | `--fp16` | off | FP16 precision (CUDA only) |
 | `--compile` | off | `torch.compile` for faster steady-state throughput |
 | `--npu` | off | Use NPU-compatible upsampling — required when loading `zipdepth_base_npu.pth` |

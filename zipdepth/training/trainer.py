@@ -2,6 +2,7 @@ import ctypes
 import gc
 import glob
 import os
+import time
 from contextlib import nullcontext
 
 import torch
@@ -17,6 +18,7 @@ except ImportError:
 
 from zipdepth.loss import ZipDepthLoss
 from zipdepth.training.visualization import depth_to_spectral
+from zipdepth.utils.model_utils import strip_state_dict_prefixes
 
 
 def trim_memory():
@@ -310,7 +312,8 @@ class ZipDepthTrainer:
                           run, which is guaranteed when set_epoch() is called with
                           the same epoch value.
         """
-        if self.is_distributed and hasattr(self.train_loader.sampler, 'set_epoch'):
+
+        if hasattr(self.train_loader.sampler, 'set_epoch'):
             self.train_loader.sampler.set_epoch(epoch)
 
         self.student.train()
@@ -322,9 +325,7 @@ class ZipDepthTrainer:
 
         with self._build_profiler() as prof:
             for batch_idx, batch in enumerate(self.train_loader):
-                # Skip already-processed batches when resuming mid-epoch.
-                # We still iterate (to keep the sampler state consistent) but
-                # discard the data without running a forward/backward pass.
+
                 if batch_idx < skip_batches:
                     pbar.update(1)
                     continue
@@ -433,7 +434,8 @@ class ZipDepthTrainer:
         if not self.is_main:
             return
 
-        model_state = self.student.module.state_dict() if self.is_distributed else self.student.state_dict()
+        raw_state = self.student.module.state_dict() if self.is_distributed else self.student.state_dict()
+        model_state = strip_state_dict_prefixes(raw_state)
 
         checkpoint = {
             'epoch': epoch,

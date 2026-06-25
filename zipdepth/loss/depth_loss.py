@@ -33,7 +33,12 @@ class ZipDepthLoss(nn.Module):
         mask: Optional[torch.Tensor] = None,
     ):
         if mask is None:
-            mask = torch.ones_like((target > 0).float())
+            # Training uses DENSE proxy depth (Depth Anything V2), so every pixel is
+            # supervised — the mask is intentionally all-ones. This also keeps the
+            # median/MAD normalization well-defined on all-zero (corrupted) samples,
+            # which a (target > 0) mask would turn into NaN. For SPARSE ground truth,
+            # pass an explicit mask=(target > 0).float() instead.
+            mask = torch.ones_like(target, dtype=torch.float32)
 
         p_hat, t_hat = self._normalize(pred, target, mask)
         ssi_loss  = self._ssi_loss(p_hat, t_hat, mask)

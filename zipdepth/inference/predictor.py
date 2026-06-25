@@ -25,6 +25,7 @@ except ImportError:
 
 from zipdepth.model.architecture import create_model
 from zipdepth.utils.colormap import depth_to_colormap
+from zipdepth.utils.model_utils import strip_state_dict_prefixes
 
 
 @dataclass
@@ -53,7 +54,7 @@ class DepthInference:
         use_half: bool = False,
         use_compile: bool = False,
         compile_mode: str = 'reduce-overhead',
-        input_size: int = 512,
+        input_size: int = 384,
         ensure_multiple_of: int = 32,
         warmup_iters: int = 3,
         upsample_unfold: bool = True,
@@ -73,6 +74,7 @@ class DepthInference:
 
         checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=True)
         sd = checkpoint.get('model_state_dict', checkpoint)
+        sd = strip_state_dict_prefixes(sd)
         missing, unexpected = self.model.load_state_dict(sd, strict=False)
         if unexpected:
             print(f"  Ignored training-only keys: {unexpected}")
@@ -298,8 +300,9 @@ class DepthInference:
             gpu_fps = 1000.0 / stats.inference_ms if stats.inference_ms > 0 else 0.0
             print(f"  Preprocessing:  {stats.preprocess_ms:6.1f} ms"
                   f"  (resize → H2D → normalize)")
+            fwd_device = "GPU" if self.device == 'cuda' else "CPU"
             print(f"  Inference:      {stats.inference_ms:6.1f} ms  →  {gpu_fps:.0f} FPS"
-                  f"  (GPU forward, {backend} {precision}, synchronized)")
+                  f"  ({fwd_device} forward, {backend} {precision}, synchronized)")
             print(f"  Postprocessing: {stats.postprocess_ms:6.1f} ms"
                   f"  (bilinear upsample → D2H)")
             print(sep)
@@ -398,7 +401,8 @@ class DepthInference:
         writer_thread.start()
 
         # ── GPU loop: no blocking syncs ───────
-        gpu_events = []   # (start_ev, end_ev) per frame for model-only timing
+        gpu_events = []   # (start_ev, end_ev) per frame for model-only timing (CUDA)
+        cpu_times = []    # per-frame model time in ms (CPU fallback)
         frame_count = 0
         t_wall_start = time.time()
         t_stamps = []     
@@ -420,12 +424,17 @@ class DepthInference:
 
                     image_tensor, _, _ = self.image2tensor(raw_image)
 
-                    ev_start = torch.cuda.Event(enable_timing=True)
-                    ev_end   = torch.cuda.Event(enable_timing=True)
-                    ev_start.record()
-                    depth = self.model(image_tensor)
-                    ev_end.record()
-                    gpu_events.append((ev_start, ev_end))
+                    if self.device == 'cuda':
+                        ev_start = torch.cuda.Event(enable_timing=True)
+                        ev_end   = torch.cuda.Event(enable_timing=True)
+                        ev_start.record()
+                        depth = self.model(image_tensor)
+                        ev_end.record()
+                        gpu_events.append((ev_start, ev_end))
+                    else:
+                        _t0 = time.perf_counter()
+                        depth = self.model(image_tensor)
+                        cpu_times.append((time.perf_counter() - _t0) * 1000)
 
                     if depth.dim() == 2:
                         depth = depth.unsqueeze(0).unsqueeze(0)
@@ -457,10 +466,15 @@ class DepthInference:
 
         t_wall = time.time() - t_wall_start
 
-        if self.device == 'cuda' and gpu_events:
-            torch.cuda.synchronize()
-        gpu_times = [s.elapsed_time(e) for s, e in gpu_events] if gpu_events else [0.0]
-        avg_gpu = float(np.mean(gpu_times))
+        if self.device == 'cuda':
+            if gpu_events:
+                torch.cuda.synchronize()
+            inf_times = [s.elapsed_time(e) for s, e in gpu_events] if gpu_events else [0.0]
+            timing_src = "GPU, CUDA events"
+        else:
+            inf_times = cpu_times or [0.0]
+            timing_src = "CPU, perf_counter"
+        avg_gpu = float(np.mean(inf_times))
         wall_fps = frame_count / t_wall if t_wall > 0 else 0
 
         print(f"\n{'='*60}")
@@ -468,7 +482,7 @@ class DepthInference:
         print(f"Failed:    {len(failed)}")
         print(f"\n  PROFILING BREAKDOWN (avg ms, async pipeline):")
         print(f"  {'Load (disk->CPU):':<28} [prefetched in background]")
-        print(f"  {'Model inference:':<28} {avg_gpu:>6.1f} ms  →  {1000/avg_gpu:.0f} FPS  (GPU, CUDA events)")
+        print(f"  {'Model inference:':<28} {avg_gpu:>6.1f} ms  →  {1000/avg_gpu:.0f} FPS  ({timing_src})")
         if colorize and t_colormap:
             print(f"  {'Colormap:':<28} {np.mean(t_colormap):>6.1f} ms  (writer thread, overlapped)")
         if t_write:
@@ -550,6 +564,7 @@ class DepthInference:
 
         # ── Pass 1: GPU loop, async D2H, no blocking syncs ────────────────────
         gpu_events = []
+        cpu_times = []    # CPU fallback timing (no CUDA events on CPU)
         frame_idx = 0
         t_stamps = []
         t_wall_start = time.time()
@@ -564,12 +579,17 @@ class DepthInference:
 
                     image_tensor, _, _ = self.image2tensor(frame)
 
-                    ev_start = torch.cuda.Event(enable_timing=True)
-                    ev_end   = torch.cuda.Event(enable_timing=True)
-                    ev_start.record()
-                    depth = self.model(image_tensor)
-                    ev_end.record()
-                    gpu_events.append((ev_start, ev_end))
+                    if self.device == 'cuda':
+                        ev_start = torch.cuda.Event(enable_timing=True)
+                        ev_end   = torch.cuda.Event(enable_timing=True)
+                        ev_start.record()
+                        depth = self.model(image_tensor)
+                        ev_end.record()
+                        gpu_events.append((ev_start, ev_end))
+                    else:
+                        _t0 = time.perf_counter()
+                        depth = self.model(image_tensor)
+                        cpu_times.append((time.perf_counter() - _t0) * 1000)
 
                     if depth.dim() == 2:
                         depth = depth.unsqueeze(0).unsqueeze(0)
@@ -604,15 +624,20 @@ class DepthInference:
         writer_thread.join()
 
         t_wall = time.time() - t_wall_start
-        if self.device == 'cuda' and gpu_events:
-            torch.cuda.synchronize()
-        gpu_times = [s.elapsed_time(e) for s, e in gpu_events] if gpu_events else [0.0]
-        avg_gpu = float(np.mean(gpu_times))
+        if self.device == 'cuda':
+            if gpu_events:
+                torch.cuda.synchronize()
+            inf_times = [s.elapsed_time(e) for s, e in gpu_events] if gpu_events else [0.0]
+            timing_src = "GPU, CUDA events"
+        else:
+            inf_times = cpu_times or [0.0]
+            timing_src = "CPU, perf_counter"
+        avg_gpu = float(np.mean(inf_times))
         wall_fps = frame_idx / t_wall if t_wall > 0 else 0
 
         print(f"\n{'='*50}")
         print(f"Frames: {frame_idx}")
-        print(f"  Model inference:  {avg_gpu:.1f} ms  →  {1000/avg_gpu:.0f} FPS  (GPU, CUDA events)")
+        print(f"  Model inference:  {avg_gpu:.1f} ms  →  {1000/avg_gpu:.0f} FPS  ({timing_src})")
         print(f"  Wall-clock:       {1000/wall_fps:.1f} ms  →  {wall_fps:.0f} FPS  (end-to-end, async)")
 
         # ── Pass 2: encode video from saved frames ────────────────────────────
