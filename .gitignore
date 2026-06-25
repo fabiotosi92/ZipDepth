@@ -55,8 +55,9 @@ Thumbs.db
 assets/training_files.txt
 assets/training_files.txt.gz
 
-# Internal profiling tools (not for public release)
+# Internal / private scripts (not for public release)
 scripts/profiler.py
+scripts/backend_compare.py
 zipdepth/utils/profiler.py
 
 # Misc
