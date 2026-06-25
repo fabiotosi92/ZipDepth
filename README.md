@@ -1,21 +1,21 @@
 <div align="center">
 
-# ZipDepth
-### Bringing Lightweight Zero-Shot Monocular Depth Anywhere, on Any Device
+# ⚡ ZipDepth
+## Bringing Lightweight Zero-Shot Monocular Depth Anywhere, on Any Device
+
+# 🏛️ ECCV 2026
 
 **[Fabio Tosi](https://fabiotosi92.github.io/) · [Luca Bartolomei](https://bartn8.github.io/) · [Matteo Poggi](https://mattpoggi.github.io/) · [Stefano Mattoccia](https://stefanomattoccia.github.io/)**
 
 University of Bologna
 
-<br>
+<br/>
 
-[![Paper](https://img.shields.io/badge/Paper-red?style=flat-square&logo=arxiv&logoColor=white)](#)
-&nbsp;
-[![Supplementary](https://img.shields.io/badge/Supplementary-orange?style=flat-square&logo=adobeacrobatreader&logoColor=white)](#)
-&nbsp;
-[![Project Page](https://img.shields.io/badge/Project%20Page-0ea5e9?style=flat-square&logo=googlechrome&logoColor=white)](https://zipdepth.github.io/)
-&nbsp;
-[![ECCV 2026](https://img.shields.io/badge/ECCV-2026-7c3aed?style=flat-square)](#)
+[![Paper](https://img.shields.io/badge/arXiv-Paper-b31b1b?style=for-the-badge&logo=arxiv&logoColor=white)](#)
+&nbsp;&nbsp;
+[![Supplementary](https://img.shields.io/badge/PDF-Supplementary-f97316?style=for-the-badge&logo=adobeacrobatreader&logoColor=white)](#)
+&nbsp;&nbsp;
+[![Project Page](https://img.shields.io/badge/Project-Page-0ea5e9?style=for-the-badge&logo=googlechrome&logoColor=white)](https://zipdepth.github.io/)
 
 </div>
 
