@@ -246,6 +246,19 @@ The output is saved next to the checkpoint by default. Pass `--output` to overri
 
 ---
 
+## 📱 Mobile / Edge Deployment
+
+Both checkpoints can be exported and run on-device — you're free to try either, but the two upsampling variants are not equally portable:
+
+- **`zipdepth_base_npu.pth` — recommended for mobile / edge / NPU.** Its unfold-free convex upsampling is built from operators that convert cleanly across mobile runtimes. Export with `--npu`.
+- **`zipdepth_base.pth`** relies on `torch.nn.Unfold` + `pixel_shuffle`, which several mobile runtimes lower poorly (or not at all). Great on GPU/server, less reliable on-device.
+
+Typical path: export to ONNX (see above), then convert to your target runtime — **ONNX Runtime Mobile**, **CoreML** (iOS), **TFLite** (Android), or **NCNN**. Starting from the NPU checkpoint maximizes the chance of a clean, fully-supported conversion.
+
+On-device latency and operator-level profiling across hardware are reported in the **Deployment Profiling** section of the supplementary material.
+
+---
+
 ## 📈 Benchmark
 
 Measures parameters, GFLOPs, and latency across backends with IQR-filtered statistics.
