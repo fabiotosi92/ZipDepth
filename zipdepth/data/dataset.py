@@ -11,6 +11,16 @@ cv2.setNumThreads(0)
 import json
 
 
+def _as_str(value) -> str:
+    """Return a Python str from a memmap index entry.
+
+    Index arrays may be stored as byte-strings (dtype ``S``, the format written
+    by ``prepare_index.py``) or as unicode strings (dtype ``U``). Decode the
+    former, pass the latter through unchanged.
+    """
+    return value.decode() if isinstance(value, (bytes, np.bytes_)) else str(value)
+
+
 class LargeScaleDepthDataset(Dataset):
 
     def __init__(self,
@@ -70,19 +80,19 @@ class LargeScaleDepthDataset(Dataset):
         print(f"  {len(self.rgb_paths):,} samples (memory-mapped)")
 
     def _filter_by_domains(self, domains):
-        domains_bytes = {d.encode() for d in domains}
+        wanted = set(domains)
         original_count = len(self.rgb_paths)
         print("  Filtering domains...")
         self.valid_indices = [
             i for i in range(len(self.domains))
-            if self.domains[i] in domains_bytes
+            if _as_str(self.domains[i]) in wanted
         ]
         print(f"  Filtered: {original_count:,} -> {len(self.valid_indices):,}")
 
     def _print_summary(self):
         domain_counts = {}
         for idx in self.valid_indices:
-            domain = self.domains[idx].decode()
+            domain = _as_str(self.domains[idx])
             domain_counts[domain] = domain_counts.get(domain, 0) + 1
 
         print(f"\nDataset summary:")
@@ -102,9 +112,9 @@ class LargeScaleDepthDataset(Dataset):
             real_idx = self.valid_indices[sample_idx]
 
             try:
-                rgb_path   = self.rgb_paths[real_idx].decode()
-                depth_path = self.depth_paths[real_idx].decode()
-                domain     = self.domains[real_idx].decode()
+                rgb_path   = _as_str(self.rgb_paths[real_idx])
+                depth_path = _as_str(self.depth_paths[real_idx])
+                domain     = _as_str(self.domains[real_idx])
 
                 rgb = self._load_rgb(rgb_path)
 
@@ -201,7 +211,7 @@ class BalancedDomainSampler(torch.utils.data.Sampler):
 
         self.domain_indices = {}
         for i, valid_idx in enumerate(dataset.valid_indices):
-            domain = dataset.domains[valid_idx].decode()
+            domain = _as_str(dataset.domains[valid_idx])
             if domain not in self.domain_indices:
                 self.domain_indices[domain] = []
             self.domain_indices[domain].append(i)
