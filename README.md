@@ -95,9 +95,16 @@ The neck combines **SPPF** multi-scale pooling with a **Cross-Scale Fusion** mod
 ```bash
 git clone https://github.com/fabiotosi92/ZipDepth
 cd ZipDepth
+
+# Create and activate a virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate
+
 pip install -r requirements.txt
 pip install -e .
 ```
+
+> **PyTorch / CUDA:** `requirements.txt` installs the default PyTorch wheel, which on Linux ships with a bundled CUDA runtime. If you need a specific CUDA version (or a CPU-only build), install PyTorch first from the [official selector](https://pytorch.org/get-started/locally/), then run `pip install -r requirements.txt`.
 
 <details>
 <summary>Optional dependencies</summary>
@@ -268,17 +275,19 @@ python scripts/benchmark.py --height 384 --width 384
 python scripts/benchmark.py --height 384 --width 384 --fp16
 ```
 
-Sample output on an **RTX 3090** (ZipDepth-base, 384×384):
+Representative latency on an **RTX 3090** (ZipDepth-base, 384×384, PyTorch 2.4.1+cu121, CUDA 12.1), from the paper's deployment profiling — median over 200 forward passes (20 warm-up):
 
 ```text
-  Backend                            Mean     Std     p95    FPS
-  ──────────────────────────────────────────────────────────────
-  Eager FP32                         5.3 ms  ±0.1   5.0    207
-  Fused FP32                         3.1 ms  ±0.0   3.1    323
-  Fused FP16                         3.8 ms  ±0.0   3.8    266
-  compile FP32 (reduce-overhead)     1.3 ms  ±0.0   1.3    768
-  compile FP16 (reduce-overhead)     1.3 ms  ±0.0   1.3    771
+  Backend                       Precision   Latency     FPS   Speedup
+  ─────────────────────────────────────────────────────────────────────
+  PyTorch Eager                 FP32         3.9 ms     255    1.0×
+  PyTorch Fused                 FP32         2.5 ms     389    1.5×
+  PyTorch Fused                 FP16         3.2 ms     307    1.2×
+  torch.compile (max-autotune)  FP16         0.9 ms    1117    4.4×
+  TensorRT (static)             FP16         0.8 ms    1317    4.9×
 ```
+
+*Fused = Conv-BN + reparameterizable branch fusion via `fuse_for_inference()`. `torch.compile` uses `mode="max-autotune"`; TensorRT is a static-shape FP16 engine (measured separately from `benchmark.py`).*
 
 ---
 
