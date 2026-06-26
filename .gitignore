@@ -51,9 +51,11 @@ wandb/
 .DS_Store
 Thumbs.db
 
-# Large release assets (hosted on Hugging Face, not in repo)
+# Large release assets (attached to GitHub Releases, not in repo)
 assets/training_files.txt
 assets/training_files.txt.gz
+training_files.txt
+training_files.txt.gz
 
 # Internal / private scripts (not for public release)
 scripts/profiler.py
