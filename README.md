@@ -293,7 +293,26 @@ Representative latency on an **RTX 3090** (ZipDepth-base, 384×384, PyTorch 2.4.
 
 ## 🧪 Evaluation
 
-We adopt the evaluation protocol and zero-shot benchmarks from [Marigold](https://github.com/prs-eth/marigold). Please refer to their repository for dataset preparation and evaluation scripts.
+We follow the zero-shot protocol of [Marigold](https://github.com/prs-eth/marigold): predictions are aligned to the ground truth with a least-squares scale and shift, then standard depth metrics are computed. Please refer to Marigold for downloading and preparing the benchmark datasets.
+
+Evaluate a checkpoint on any supported benchmark with a single command:
+
+```bash
+python scripts/eval.py \
+  --dataset nyuv2 \
+  --data_dir /path/to/NYUv2/test \
+  --checkpoint checkpoints/zipdepth_base.pth
+```
+
+| `--dataset` | Benchmark | Expected layout |
+|-------------|-----------|-----------------|
+| `nyuv2`   | NYUv2          | `{scene}/rgb_*.png` + `depth_*.png` |
+| `kitti`   | KITTI (Eigen)  | `{date}/{drive}/image_02/data/*.png` + `proj_depth/groundtruth/image_02/*.png` |
+| `eth3d`   | ETH3D          | `depth/{scene}/...` + `images/{scene}/...` |
+| `scannet` | ScanNet        | `{scene}/color/*.jpg` + `depth/*.png` |
+| `diode`   | DIODE          | `{indoors,outdoor}/scene_*/scan_*/*.png` + `*_depth.npy` |
+
+The per-dataset depth range, KITTI crop, and Eigen mask are applied automatically. Metrics are printed and saved to `eval_results/<dataset>/accuracy_<dataset>.json`, with per-sample values in `per_sample.csv`. Add `--fp16` for half-precision inference, or `--npu` when evaluating the `zipdepth_base_npu.pth` checkpoint.
 
 ---
 

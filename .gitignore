@@ -25,6 +25,7 @@ checkpoints/**
 
 # Outputs
 output/
+eval_results/
 *_depth.mp4
 *_depth_frames/
 *_depth.jpg
@@ -61,6 +62,9 @@ training_files.txt.gz
 scripts/profiler.py
 scripts/backend_compare.py
 zipdepth/utils/profiler.py
+
+# Paper source (kept locally, not part of the code release)
+latex/
 
 # Misc
 *.tmp
