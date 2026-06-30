@@ -120,7 +120,7 @@ class ZipDepthTrainer:
         )
 
         # Compile student for faster iteration (PyTorch >= 2.0)
-        self.student = torch.compile(self.student)
+        self.student = torch.compile(self.student, mode="reduce-overhead")
 
     def _restart_workers(self):
         """Kill and recreate worker processes"""

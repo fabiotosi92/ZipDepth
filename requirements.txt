@@ -1,16 +1,16 @@
 # Core
-torch>=2.4.0
-torchvision>=0.19.0
+torch>=2.12.0
+torchvision>=0.27.0
 
 # Image processing
-numpy>=1.26.0
-opencv-python>=4.10.0
+numpy>=2.0.0
+opencv-python-headless>=4.10.0
 Pillow>=10.0.0
-matplotlib>=3.5.0
-PyTurboJPEG>=1.7.0  # needs the system libturbojpeg library
+matplotlib>=3.9.0
+PyTurboJPEG>=1.7.0,<2.0  # 2.x requires libjpeg-turbo 3.x; system ships 2.x
 
 # Augmentation (training)
-albumentations>=1.3.0
+albumentations>=2.0.0
 
 # Data
 h5py>=3.10.0
