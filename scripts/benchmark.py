@@ -36,21 +36,28 @@ class _nullctx:
 def _measure(model, x, warmup: int, measure: int, ctx=None) -> dict:
     extra = ctx or _nullctx()
     device = x.device.type
-    with torch.no_grad(), extra:
+    with torch.inference_mode(), extra:
         for _ in range(warmup):
             model(x)
             if device == 'cuda':
                 torch.cuda.synchronize()
     lats = []
-    with torch.no_grad(), extra:
-        for _ in range(measure):
-            if device == 'cuda':
+    if device == 'cuda':
+        start = torch.cuda.Event(enable_timing=True)
+        end   = torch.cuda.Event(enable_timing=True)
+        with torch.inference_mode(), extra:
+            for _ in range(measure):
+                start.record()
+                model(x)
+                end.record()
                 torch.cuda.synchronize()
-            t0 = time.perf_counter()
-            model(x)
-            if device == 'cuda':
-                torch.cuda.synchronize()
-            lats.append((time.perf_counter() - t0) * 1000)
+                lats.append(start.elapsed_time(end))
+    else:
+        with torch.inference_mode(), extra:
+            for _ in range(measure):
+                t0 = time.perf_counter()
+                model(x)
+                lats.append((time.perf_counter() - t0) * 1000)
     arr = np.array(lats)
     q1, q3 = np.percentile(arr, [25, 75])
     arr = arr[(arr >= q1 - 1.5 * (q3 - q1)) & (arr <= q3 + 1.5 * (q3 - q1))]
@@ -120,7 +127,7 @@ def _flops_consistency_check(model, x, label: str) -> None:
         print(f"    *** investigate: ops counted by profiler but not fvcore (or vice versa) ***")
 
 
-def _print_model_info(model, model_fused, input_size, device):
+def _print_model_info(model, model_fused, input_size, device, skip_flops_check=False):
     x = torch.randn(*input_size).to(device)
 
     total   = sum(p.numel() for p in model.parameters())
@@ -184,13 +191,13 @@ def _print_model_info(model, model_fused, input_size, device):
     if uf is None and fu is None:
         print("  install fvcore or thop to measure")
 
-    # Cross-check fvcore vs torch.profiler on the fused model (CPU, to avoid CUDA profiler overhead)
-    print(f"\n  FLOPs cross-check  (fvcore vs torch.profiler, CPU)")
-    print(f"  {'─'*54}")
-    cpu_model = copy.deepcopy(model_fused).cpu().eval()
-    x_cpu = x.cpu()
-    _flops_consistency_check(cpu_model, x_cpu, label='fused, CPU')
-    del cpu_model, x_cpu
+    if not skip_flops_check:
+        print(f"\n  FLOPs cross-check  (fvcore vs torch.profiler, CPU)")
+        print(f"  {'─'*54}")
+        cpu_model = copy.deepcopy(model_fused).cpu().eval()
+        x_cpu = x.cpu()
+        _flops_consistency_check(cpu_model, x_cpu, label='fused, CPU')
+        del cpu_model, x_cpu
 
 
 # =============================================================================
@@ -220,6 +227,8 @@ def main():
 
     device = 'cuda' if torch.cuda.is_available() and not args.cpu_only else 'cpu'
     input_size = (1, 3, args.height, args.width)
+    if device == 'cuda':
+        torch.backends.cudnn.benchmark = True
 
     # ── Load model ────────────────────────────────────────────────────────────
     model = create_model(variant=args.variant, global_mode=args.global_mode,
@@ -238,21 +247,22 @@ def main():
         print("  WARNING: no checkpoint — random weights. Latency is valid; depth output is meaningless.")
     model = model.to(device).eval()
 
-    m_fused = copy.deepcopy(model).to(device).eval()
-    m_fused.fuse_for_inference()
-    fuse_remaining_conv_bn(m_fused)
-
     x = torch.randn(*input_size).to(device)
 
-    # ── Header ────────────────────────────────────────────────────────────────
+    # ── Header + model info (m_fused created temporarily, then freed) ─────────
     print(f"\n{'='*60}")
     print(f"  ZipDepth-{args.variant}  |  {args.width}x{args.height}")
     if device == 'cuda':
         print(f"  GPU: {torch.cuda.get_device_name(0)}")
     print(f"{'='*60}")
 
-    # ── Model info ────────────────────────────────────────────────────────────
-    _print_model_info(model, m_fused, input_size, device)
+    m_fused_info = copy.deepcopy(model).to(device).eval()
+    m_fused_info.fuse_for_inference()
+    fuse_remaining_conv_bn(m_fused_info)
+    _print_model_info(model, m_fused_info, input_size, device, skip_flops_check=True)
+    del m_fused_info
+    if device == 'cuda':
+        torch.cuda.empty_cache()
 
     # ── Benchmarks ────────────────────────────────────────────────────────────
     results = []
@@ -268,10 +278,22 @@ def main():
     print(f"  {'Backend':<40s}  {'Mean':>6}   {'Std':>5}   {'p95':>5}   FPS")
     print(f"  {'─'*66}")
 
-    # 1. Eager FP32
-    _run("Eager FP32", copy.deepcopy(model).to(device).eval())
+    # 1. Eager FP32 — m_fused not in VRAM, same conditions as profiler
+    m_eager = copy.deepcopy(model).to(device).eval()
+    if device == 'cuda':
+        with torch.inference_mode():
+            for _ in range(100):
+                m_eager(x); torch.cuda.synchronize()
+    _run("Eager FP32", m_eager)
+    del m_eager
+    if device == 'cuda':
+        torch.cuda.empty_cache()
 
-    # 2. Fused FP32
+    # 2. Fused FP32 — create m_fused now for all remaining backends
+    m_fused = copy.deepcopy(model).to(device).eval()
+    m_fused.fuse_for_inference()
+    fuse_remaining_conv_bn(m_fused)
+
     _run("Fused FP32", m_fused)
 
     # 3. Fused FP16
@@ -282,7 +304,7 @@ def main():
     if not args.no_compile and device == 'cuda':
         print(f"\n  Compiling ({args.compile_mode}) — warming up ...")
         mc = torch.compile(copy.deepcopy(m_fused), mode=args.compile_mode, fullgraph=False)
-        with torch.no_grad():
+        with torch.inference_mode():
             for _ in range(max(args.warmup, 30)):
                 mc(x); torch.cuda.synchronize()
         print(f"  {'─'*66}")
@@ -293,7 +315,7 @@ def main():
         if args.fp16:
             ctx_fp16 = torch.autocast(device_type='cuda', dtype=torch.float16)
             mc_fp16 = torch.compile(copy.deepcopy(m_fused), mode=args.compile_mode, fullgraph=False)
-            with torch.no_grad(), ctx_fp16:
+            with torch.inference_mode(), ctx_fp16:
                 for _ in range(max(args.warmup, 50)):
                     mc_fp16(x); torch.cuda.synchronize()
             _run(f"compile FP16 ({args.compile_mode})", mc_fp16, ctx=ctx_fp16)
