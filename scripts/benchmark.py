@@ -28,15 +28,9 @@ from zipdepth.utils.model_utils import fuse_remaining_conv_bn, strip_state_dict_
 # HELPERS
 # =============================================================================
 
-class _nullctx:
-    def __enter__(self): return self
-    def __exit__(self, *a): pass
-
-
-def _measure(model, x, warmup: int, measure: int, ctx=None) -> dict:
-    extra = ctx or _nullctx()
+def _measure(model, x, warmup: int, measure: int) -> dict:
     device = x.device.type
-    with torch.inference_mode(), extra:
+    with torch.inference_mode():
         for _ in range(warmup):
             model(x)
             if device == 'cuda':
@@ -45,7 +39,7 @@ def _measure(model, x, warmup: int, measure: int, ctx=None) -> dict:
     if device == 'cuda':
         start = torch.cuda.Event(enable_timing=True)
         end   = torch.cuda.Event(enable_timing=True)
-        with torch.inference_mode(), extra:
+        with torch.inference_mode():
             for _ in range(measure):
                 start.record()
                 model(x)
@@ -53,7 +47,7 @@ def _measure(model, x, warmup: int, measure: int, ctx=None) -> dict:
                 torch.cuda.synchronize()
                 lats.append(start.elapsed_time(end))
     else:
-        with torch.inference_mode(), extra:
+        with torch.inference_mode():
             for _ in range(measure):
                 t0 = time.perf_counter()
                 model(x)
@@ -267,8 +261,8 @@ def main():
     # ── Benchmarks ────────────────────────────────────────────────────────────
     results = []
 
-    def _run(label, m, ctx=None):
-        r = _measure(m, x, args.warmup, args.measure, ctx)
+    def _run(label, m, x_in=None):
+        r = _measure(m, x_in if x_in is not None else x, args.warmup, args.measure)
         results.append((label, r))
         print(f"  {label:<40s}  {r['mean_ms']:6.2f} ± {r['std_ms']:.2f} ms"
               f"  p95={r['p95_ms']:.2f}  {r['fps']:.1f} FPS")
@@ -297,8 +291,13 @@ def main():
     _run("Fused FP32", m_fused)
 
     # 3. Fused FP16
+    x_fp16 = None
     if args.fp16 and device == 'cuda':
-        _run("Fused FP16", m_fused, ctx=torch.autocast(device_type='cuda', dtype=torch.float16))
+        x_fp16 = x.half()
+        m_fp16 = copy.deepcopy(m_fused).half()
+        _run("Fused FP16", m_fp16, x_in=x_fp16)
+        del m_fp16
+        torch.cuda.empty_cache()
 
     # 4. torch.compile
     if not args.no_compile and device == 'cuda':
@@ -313,12 +312,13 @@ def main():
         _run(f"compile FP32 ({args.compile_mode})", mc)
 
         if args.fp16:
-            ctx_fp16 = torch.autocast(device_type='cuda', dtype=torch.float16)
-            mc_fp16 = torch.compile(copy.deepcopy(m_fused), mode=args.compile_mode, fullgraph=False)
-            with torch.inference_mode(), ctx_fp16:
+            if x_fp16 is None:
+                x_fp16 = x.half()
+            mc_fp16 = torch.compile(copy.deepcopy(m_fused).half(), mode=args.compile_mode, fullgraph=False)
+            with torch.inference_mode():
                 for _ in range(max(args.warmup, 50)):
-                    mc_fp16(x); torch.cuda.synchronize()
-            _run(f"compile FP16 ({args.compile_mode})", mc_fp16, ctx=ctx_fp16)
+                    mc_fp16(x_fp16); torch.cuda.synchronize()
+            _run(f"compile FP16 ({args.compile_mode})", mc_fp16, x_in=x_fp16)
 
     # ── Summary ───────────────────────────────────────────────────────────────
     if results:
