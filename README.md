@@ -16,7 +16,7 @@ University of Bologna
 
 [![Paper](https://img.shields.io/badge/arXiv-Paper-b31b1b?style=for-the-badge&logo=arxiv&logoColor=white)](#)
 &nbsp;&nbsp;
-[![Supplementary](https://img.shields.io/badge/PDF-Supplementary-f97316?style=for-the-badge&logo=adobeacrobatreader&logoColor=white)](#)
+[![Supplementary](https://img.shields.io/badge/PDF-Supplementary-f97316?style=for-the-badge&logo=adobeacrobatreader&logoColor=white)](https://zipdepth.github.io/static/pdfs/zipdepth_supplementary.pdf)
 &nbsp;&nbsp;
 [![Project Page](https://img.shields.io/badge/Project-Page-0ea5e9?style=for-the-badge&logo=googlechrome&logoColor=white)](https://zipdepth.github.io/)
 
