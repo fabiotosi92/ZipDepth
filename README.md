@@ -14,7 +14,7 @@ University of Bologna
 
 <br/>
 
-[![Paper](https://img.shields.io/badge/arXiv-Paper-b31b1b?style=for-the-badge&logo=arxiv&logoColor=white)](#)
+[![Paper](https://img.shields.io/badge/arXiv-Paper-b31b1b?style=for-the-badge&logo=arxiv&logoColor=white)](https://arxiv.org/abs/2607.08771)
 &nbsp;&nbsp;
 [![Supplementary](https://img.shields.io/badge/PDF-Supplementary-f97316?style=for-the-badge&logo=adobeacrobatreader&logoColor=white)](https://zipdepth.github.io/static/pdfs/zipdepth_supplementary.pdf)
 &nbsp;&nbsp;
