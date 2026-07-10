@@ -652,32 +652,6 @@ class ZipDepth(nn.Module):
         return self
 
     # ------------------------------------------------------------------
-    @torch.no_grad()
-    def export_onnx(
-        self,
-        path: str,
-        input_size: Tuple[int, int] = (512, 512),
-        dynamic_batch: bool = False,
-        opset: int = 17
-    ):
-        self.fuse_for_inference()
-        dummy = torch.randn(1, 3, *input_size)
-
-        dynamic_axes = None
-        if dynamic_batch:
-            dynamic_axes = {'image': {0: 'batch'}, 'depth': {0: 'batch'}}
-
-        torch.onnx.export(
-            self, dummy, path,
-            input_names  =['image'],
-            output_names =['depth'],
-            dynamic_axes  = dynamic_axes,
-            opset_version = opset,
-            do_constant_folding=True,
-        )
-        print(f"Exported to {path}")
-
-    # ------------------------------------------------------------------
     def get_model_info(self) -> Dict[str, Any]:
         cfg = MODEL_CONFIGS.get(self.variant, MODEL_CONFIGS['base'])
         return {
