@@ -5,6 +5,7 @@ Usage:
     python scripts/benchmark.py --height 384 --width 384
     python scripts/benchmark.py --ckpt checkpoints/model.pth
     python scripts/benchmark.py --fp16
+    python scripts/benchmark.py --fp16 --channels-last
     python scripts/benchmark.py --compile-mode max-autotune
 """
 
@@ -201,7 +202,7 @@ def _print_model_info(model, model_fused, input_size, device, skip_flops_check=F
 def main():
     parser = argparse.ArgumentParser(description='ZipDepth benchmark')
     parser.add_argument('--variant',      type=str, default='base',
-                        choices=['small', 'base', 'large', 'giant'])
+                        choices=['nano', 'small', 'base', 'large', 'xlarge'])
     parser.add_argument('--global-mode',  type=str, default='balanced',
                         choices=['none', 'balanced', 'full'])
     parser.add_argument('--height',       type=int, default=384)
@@ -214,15 +215,18 @@ def main():
     parser.add_argument('--compile-mode', type=str, default='reduce-overhead',
                         choices=['reduce-overhead', 'max-autotune'],
                         help='torch.compile mode (default: reduce-overhead)')
-    parser.add_argument('--no-compile',   action='store_true',
+    parser.add_argument('--no-compile',     action='store_true',
                         help='Skip torch.compile')
-    parser.add_argument('--cpu-only',     action='store_true')
+    parser.add_argument('--channels-last',  action='store_true',
+                        help='Use channels_last memory format (NHWC) — matches production predictor')
+    parser.add_argument('--cpu-only',       action='store_true')
     args = parser.parse_args()
 
     device = 'cuda' if torch.cuda.is_available() and not args.cpu_only else 'cpu'
     input_size = (1, 3, args.height, args.width)
     if device == 'cuda':
         torch.backends.cudnn.benchmark = True
+        torch.set_float32_matmul_precision('high')
 
     # ── Load model ────────────────────────────────────────────────────────────
     model = create_model(variant=args.variant, global_mode=args.global_mode,
@@ -242,6 +246,8 @@ def main():
     model = model.to(device).eval()
 
     x = torch.randn(*input_size).to(device)
+    if args.channels_last and device == 'cuda':
+        x = x.to(memory_format=torch.channels_last)
 
     # ── Header + model info (m_fused created temporarily, then freed) ─────────
     print(f"\n{'='*60}")
@@ -272,13 +278,19 @@ def main():
     print(f"  {'Backend':<40s}  {'Mean':>6}   {'Std':>5}   {'p95':>5}   FPS")
     print(f"  {'─'*66}")
 
-    # 1. Eager FP32 — m_fused not in VRAM, same conditions as profiler
-    m_eager = copy.deepcopy(model).to(device).eval()
+    cl = args.channels_last and device == 'cuda'
+    cl_suffix = " +CL" if cl else ""
+
+    def _to_cl(m):
+        return m.to(memory_format=torch.channels_last) if cl else m
+
+    # 1. Eager FP32
+    m_eager = _to_cl(copy.deepcopy(model).to(device).eval())
     if device == 'cuda':
         with torch.inference_mode():
             for _ in range(100):
                 m_eager(x); torch.cuda.synchronize()
-    _run("Eager FP32", m_eager)
+    _run(f"Eager FP32{cl_suffix}", m_eager)
     del m_eager
     if device == 'cuda':
         torch.cuda.empty_cache()
@@ -287,38 +299,39 @@ def main():
     m_fused = copy.deepcopy(model).to(device).eval()
     m_fused.fuse_for_inference()
     fuse_remaining_conv_bn(m_fused)
+    m_fused = _to_cl(m_fused)
 
-    _run("Fused FP32", m_fused)
+    _run(f"Fused FP32{cl_suffix}", m_fused)
 
     # 3. Fused FP16
     x_fp16 = None
     if args.fp16 and device == 'cuda':
         x_fp16 = x.half()
-        m_fp16 = copy.deepcopy(m_fused).half()
-        _run("Fused FP16", m_fp16, x_in=x_fp16)
+        m_fp16 = _to_cl(copy.deepcopy(m_fused).half())
+        _run(f"Fused FP16{cl_suffix}", m_fp16, x_in=x_fp16)
         del m_fp16
         torch.cuda.empty_cache()
 
     # 4. torch.compile
     if not args.no_compile and device == 'cuda':
         print(f"\n  Compiling ({args.compile_mode}) — warming up ...")
-        mc = torch.compile(copy.deepcopy(m_fused), mode=args.compile_mode, fullgraph=False)
+        mc = torch.compile(_to_cl(copy.deepcopy(m_fused)), mode=args.compile_mode, fullgraph=False)
         with torch.inference_mode():
             for _ in range(max(args.warmup, 30)):
                 mc(x); torch.cuda.synchronize()
         print(f"  {'─'*66}")
         print(f"  {'Backend':<40s}  {'Mean':>6}   {'Std':>5}   {'p95':>5}   FPS")
         print(f"  {'─'*66}")
-        _run(f"compile FP32 ({args.compile_mode})", mc)
+        _run(f"compile FP32 ({args.compile_mode}){cl_suffix}", mc)
 
         if args.fp16:
             if x_fp16 is None:
                 x_fp16 = x.half()
-            mc_fp16 = torch.compile(copy.deepcopy(m_fused).half(), mode=args.compile_mode, fullgraph=False)
+            mc_fp16 = torch.compile(_to_cl(copy.deepcopy(m_fused).half()), mode=args.compile_mode, fullgraph=False)
             with torch.inference_mode():
                 for _ in range(max(args.warmup, 50)):
                     mc_fp16(x_fp16); torch.cuda.synchronize()
-            _run(f"compile FP16 ({args.compile_mode})", mc_fp16, x_in=x_fp16)
+            _run(f"compile FP16 ({args.compile_mode}){cl_suffix}", mc_fp16, x_in=x_fp16)
 
     # ── Summary ───────────────────────────────────────────────────────────────
     if results:

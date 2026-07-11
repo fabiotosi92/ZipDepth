@@ -89,6 +89,10 @@ class DepthInference:
         if self.use_half:
             self.model = self.model.half()
 
+        if device == 'cuda':
+            self.model = self.model.to(memory_format=torch.channels_last)
+            torch.set_float32_matmul_precision('high')  # TF32 Tensor Cores for FP32 matmul
+
         if self.use_compile:
             print(f"Compiling model (mode={compile_mode}) ...")
             self.model = torch.compile(self.model, mode=compile_mode, fullgraph=False)
@@ -161,8 +165,10 @@ class DepthInference:
         self._gpu_buf_u8 = torch.empty(new_h, new_w, 3, dtype=torch.uint8, device=self.device)
         self._gpu_buf_u8_shape = shape
 
-        # GPU float model input: [1, 3, H, W]
-        self._gpu_buf_float = torch.empty(1, 3, new_h, new_w, dtype=self.dtype, device=self.device)
+        # GPU float model input: [1, 3, H, W] — channels_last on CUDA for Tensor Core efficiency
+        mf = torch.channels_last if self.device == 'cuda' else torch.contiguous_format
+        self._gpu_buf_float = torch.empty(1, 3, new_h, new_w, dtype=self.dtype,
+                                          device=self.device).to(memory_format=mf)
         self._gpu_buf_float_shape = shape
 
     def image2tensor(self, raw_image: np.ndarray) -> Tuple[torch.Tensor, int, int]:
