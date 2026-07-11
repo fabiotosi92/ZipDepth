@@ -1,6 +1,5 @@
 import numpy as np
 import albumentations as A
-from albumentations.core.transforms_interface import DualTransform
 from typing import Tuple, Optional
 import cv2
 cv2.setNumThreads(0)

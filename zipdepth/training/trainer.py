@@ -122,44 +122,6 @@ class ZipDepthTrainer:
         # Compile student for faster iteration (PyTorch >= 2.0)
         self.student = torch.compile(self.student, mode="reduce-overhead")
 
-    def _restart_workers(self):
-        """Kill and recreate worker processes"""
-        if not self.is_main:
-            return
-
-        print(f"\n[Step {self.global_step}] RESTARTING WORKERS to free memory...")
-
-        # Save config
-        if self._loader_config is None:
-            self._loader_config = {
-                'dataset': self.train_loader.dataset,
-                'batch_size': self.train_loader.batch_size,
-                'shuffle': False,
-                'sampler': self.train_loader.sampler,
-                'num_workers': self.train_loader.num_workers,
-                'pin_memory': self.train_loader.pin_memory,
-                'drop_last': True,
-                'persistent_workers': False,
-                'prefetch_factor': 1,
-                'worker_init_fn': self.train_loader.worker_init_fn,
-            }
-
-        # Destroy old loader (kills workers)
-        old_loader = self.train_loader
-        del old_loader
-
-        # Force cleanup
-        gc.collect()
-
-        # Wait briefly for workers to die
-        time.sleep(2)
-
-        # Recreate loader (new worker processes)
-        from torch.utils.data import DataLoader
-        self.train_loader = DataLoader(**self._loader_config)
-
-        print(f"  -> Workers restarted\n")
-
     def train(self, num_epochs: int, save_dir: str = './checkpoints', start_epoch: int = 0,
             save_every_steps: int = 0, max_step_checkpoints: int = 5, max_steps: int = 0):
         if self.is_main:
