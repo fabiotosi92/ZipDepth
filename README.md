@@ -29,6 +29,8 @@ University of Bologna
 - **[Jul 2026]** — 🚀 Code and pretrained model released.
 - **[Jun 2026]** — 🎉 ZipDepth accepted at ECCV 2026.
 
+> 📱 See ZipDepth running live on an iPhone on the [project page](https://zipdepth.github.io/).
+
 ---
 
 ZipDepth is a lightweight zero-shot monocular depth estimation model that achieves the best accuracy–efficiency trade-off among lightweight methods, approaching transformer-based foundation models at a fraction of their cost. It combines reparameterizable convolutions (RepVGG), efficient global attention with learnable tokens, and a compact FPN decoder — all designed to run fast on any device, from edge hardware to server GPUs.
